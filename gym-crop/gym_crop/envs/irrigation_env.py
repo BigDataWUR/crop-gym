@@ -30,8 +30,8 @@ class IrrigationEnv(gym.Env):
         self.parameterprovider = ParameterProvider(soildata=soil, cropdata=crop, sitedata=site)
         weatherfile = os.path.join(data_dir, 'meteo', 'nl1.xlsx')
         self.weatherdataprovider = ExcelWeatherDataProvider(weatherfile)
-        self.agromanagement, crop_start_date = self._load_agromanagement_data()
-        self.dates = [crop_start_date]
+        self.agromanagement, self.crop_start_date, self.crop_end_date = self._load_agromanagement_data()
+        self.dates = [self.crop_start_date]
 
     def step(self, action):
         """
@@ -75,7 +75,8 @@ class IrrigationEnv(gym.Env):
 
         reward = output['TWSO'][-1] if not np.isnan(output['TWSO'][-1]) else 0
 
-        return observation, reward, wofost.flag_terminate, {yaml.dump(agromanagement)}
+        done = self.dates[-1] > self.crop_end_date
+        return observation, reward, done, {yaml.dump(agromanagement)}
 
     def _create_agromanagement_file(self):
         event_table = []
@@ -93,7 +94,8 @@ class IrrigationEnv(gym.Env):
         with open(os.path.join(data_dir, 'agro/agromanagement_irrigation.yaml')) as file:
             agromanagement = yaml.load(file, Loader=yaml.SafeLoader)
         crop_start_date = list(agromanagement[0].values())[0]['CropCalendar']['crop_start_date']
-        return agromanagement, crop_start_date
+        crop_end_date = list(agromanagement[0].values())[0]['CropCalendar']['crop_end_date']
+        return agromanagement, crop_start_date, crop_end_date
 
 
 def get_weather(weatherdataprovider, date, days):
