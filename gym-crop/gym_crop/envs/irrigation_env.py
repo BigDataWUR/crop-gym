@@ -99,6 +99,12 @@ class IrrigationEnv(gym.Env):
         crop_end_date = list(agromanagement[0].values())[0]['CropCalendar']['crop_end_date']
         return agromanagement, crop_start_date, crop_end_date
 
+    def reset(self):
+        self.past_actions = []
+        self.dates = [self.crop_start_date]
+
+    def render(self, mode='human', close=False):
+        pass
 
 def get_weather(weatherdataprovider, date, days):
     dates = [date + datetime.timedelta(i) for i in range(0, days)]
