@@ -12,7 +12,6 @@ import pandas as pd
 from pcse.fileinput import ExcelWeatherDataProvider
 from pcse.models import Wofost71_WLP_FD
 from pcse.fileinput import CABOFileReader, YAMLCropDataProvider
-from pcse.db import NASAPowerWeatherDataProvider
 from pcse.util import WOFOST71SiteDataProvider
 from pcse.base import ParameterProvider
 
@@ -23,7 +22,7 @@ class IrrigationEnv(gym.Env):
 
     def __init__(self):
         self.action_space = spaces.Discrete(2)
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(11,))
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(74,))
         self.past_actions = []
         crop = YAMLCropDataProvider()
         soil = CABOFileReader(os.path.join(data_dir, "soil", "ec3.soil"))
@@ -63,15 +62,20 @@ class IrrigationEnv(gym.Env):
                  use this for learning.
         """
         self.past_actions.append(action)
+        # observation takes place one week after the chosen action
         self.dates.append(self.dates[-1] + datetime.timedelta(7))
         agromanagement = self._create_agromanagement_file()
         wofost = Wofost71_WLP_FD(self.parameterprovider, self.weatherdataprovider, agromanagement)
         wofost.run_till_terminate()
         output = pd.DataFrame(wofost.get_output()).set_index("day")
-        ob = np.array(output.iloc[-1])
+        crop_observation = np.array(output.iloc[-1])
+        # forecast for the week after the observation
+        weather_forecast = get_weather(self.weatherdataprovider, self.dates[-1], 7)
+        observation = np.concatenate([crop_observation, weather_forecast.flatten()])
+
         reward = output['TWSO'][-1] if not np.isnan(output['TWSO'][-1]) else 0
 
-        return ob, reward, wofost.flag_terminate, {yaml.dump(agromanagement)}
+        return observation, reward, wofost.flag_terminate, {yaml.dump(agromanagement)}
 
     def _create_agromanagement_file(self):
         event_table = []
@@ -80,6 +84,7 @@ class IrrigationEnv(gym.Env):
                 event_table.append({date: {'amount': 10, 'efficiency': 0.7}})
         new_management = copy.deepcopy(self.agromanagement)
         next(iter(new_management[0].values()))['TimedEvents'][0]['events_table'] = event_table
+        # terminate on the observation date
         new_management.append({self.dates[-1]: None})
 
         return new_management
@@ -90,3 +95,13 @@ class IrrigationEnv(gym.Env):
         crop_start_date = list(agromanagement[0].values())[0]['CropCalendar']['crop_start_date']
         return agromanagement, crop_start_date
 
+
+def get_weather(weatherdataprovider, date, days):
+    dates = [date + datetime.timedelta(i) for i in range(0, days)]
+    weather = [get_weather_day(weatherdataprovider, day) for day in dates]
+    return np.array(weather)
+
+def get_weather_day(weatherdataprovider, date):
+    weatherdatacontainer = weatherdataprovider(date)
+    weather = [getattr(weatherdatacontainer, attr) for attr in weatherdatacontainer.required]
+    return weather
