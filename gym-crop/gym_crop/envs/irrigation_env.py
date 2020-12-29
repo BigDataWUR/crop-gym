@@ -32,6 +32,7 @@ class IrrigationEnv(gym.Env):
         self.weatherdataprovider = ExcelWeatherDataProvider(weatherfile)
         self.agromanagement, self.crop_start_date, self.crop_end_date = self._load_agromanagement_data()
         self.dates = [self.crop_start_date]
+        self.intervention_interval = 7
 
     def step(self, action):
         """
@@ -63,7 +64,7 @@ class IrrigationEnv(gym.Env):
         """
         self.past_actions.append(action)
         # observation takes place one week after the chosen action
-        self.dates.append(self.dates[-1] + datetime.timedelta(7))
+        self.dates.append(self.dates[-1] + datetime.timedelta(self.intervention_interval))
         agromanagement = self._create_agromanagement_file()
         wofost = Wofost71_WLP_FD(self.parameterprovider, self.weatherdataprovider, agromanagement)
         wofost.run_till_terminate()
@@ -73,7 +74,8 @@ class IrrigationEnv(gym.Env):
         weather_forecast = get_weather(self.weatherdataprovider, self.dates[-1], 7)
         observation = np.concatenate([crop_observation, weather_forecast.flatten()])
 
-        reward = output['TWSO'][-1] if not np.isnan(output['TWSO'][-1]) else 0
+        growth = output['TWSO'][-1] - output['TWSO'][-1-self.intervention_interval]
+        reward = growth if not np.isnan(growth) else 0
 
         done = self.dates[-1] > self.crop_end_date
         return observation, reward, done, {yaml.dump(agromanagement)}
