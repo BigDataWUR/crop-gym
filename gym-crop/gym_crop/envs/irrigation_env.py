@@ -78,17 +78,21 @@ class IrrigationEnv(gym.Env):
         reward = growth if not np.isnan(growth) else 0
 
         done = self.dates[-1] > self.crop_end_date
-        return observation, reward, done, {yaml.dump(agromanagement)}
 
-    def _create_agromanagement_file(self):
+        return observation, reward, done, {'management':yaml.dump(agromanagement)}
+
+    def _create_agromanagement_file(self, set_campaign_end=None):
         event_table = []
         for date, action in zip(self.dates[:-1], self.past_actions):
             if action == 1:
                 event_table.append({date: {'amount': 10, 'efficiency': 0.7}})
         new_management = copy.deepcopy(self.agromanagement)
         next(iter(new_management[0].values()))['TimedEvents'][0]['events_table'] = event_table
-        # terminate on the observation date
-        new_management.append({self.dates[-1]: None})
+        if set_campaign_end:
+            new_management.append({set_campaign_end: None})
+        else:
+            # terminate on the observation date
+            new_management.append({self.dates[-1]: None})
 
         return new_management
 
@@ -99,9 +103,23 @@ class IrrigationEnv(gym.Env):
         crop_end_date = list(agromanagement[0].values())[0]['CropCalendar']['crop_end_date']
         return agromanagement, crop_start_date, crop_end_date
 
+    def seed(self, seed=None):
+        return
+
     def reset(self):
         self.past_actions = []
         self.dates = [self.crop_start_date]
+        agromanagement = self._create_agromanagement_file(set_campaign_end=self.crop_start_date+datetime.timedelta(1))
+        wofost = Wofost71_WLP_FD(self.parameterprovider, self.weatherdataprovider, agromanagement)
+        wofost.run_till_terminate()
+        output = pd.DataFrame(wofost.get_output()).set_index("day")
+        crop_observation = np.array(output.iloc[-2])
+        # forecast for the week after the observation
+        weather_forecast = get_weather(self.weatherdataprovider, self.dates[-1], 7)
+        observation = np.concatenate([crop_observation, weather_forecast.flatten()])
+
+        return observation
+
 
     def render(self, mode='human', close=False):
         pass
