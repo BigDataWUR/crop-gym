@@ -1,4 +1,4 @@
-- 2006-01-01:
+- 2006-03-01:
     CropCalendar:
         crop_name: sugarbeet
         variety_name: Sugarbeet_603
@@ -9,7 +9,5 @@
         max_duration: 300
     StateEvents:
     TimedEvents:
-      - event_signal: irrigate
-        events_table: None
-        name: Irrigation application table
-        comment: All irrigation amounts in cm
+- 2007-01-01:
+  
