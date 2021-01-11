@@ -12,8 +12,8 @@ data_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'env_data/'
 class IrrigationEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self):
-        self.action_space = gym.spaces.Discrete(2)
+    def __init__(self, data_dir=data_dir, intervention_interval=7, weather_forecast_length=7):
+        self.action_space = gym.spaces.Discrete(5)
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(74,))
         crop = pcse.fileinput.YAMLCropDataProvider()
         soil = pcse.fileinput.CABOFileReader(os.path.join(data_dir, "soil", "ec3.soil"))
@@ -23,8 +23,8 @@ class IrrigationEnv(gym.Env):
         self.weatherdataprovider = pcse.fileinput.ExcelWeatherDataProvider(weatherfile)
         self.agromanagement, self.crop_end_date = self._load_agromanagement_data()
         self.wofost = pcse.models.Wofost71_WLP_FD(self.parameterprovider, self.weatherdataprovider, self.agromanagement)
-        self.intervention_interval = 7
-        self.weather_forecast_length = 7
+        self.intervention_interval = intervention_interval
+        self.weather_forecast_length = weather_forecast_length
 
     def step(self, action):
         """
@@ -87,11 +87,7 @@ class IrrigationEnv(gym.Env):
         return output
 
     def _take_action(self, action):
-        if action==1:
-            self.wofost._send_signal(signal=pcse.signals.irrigate, amount=10, efficiency=0.7) # water in cm
-
-    def seed(self, seed=None):
-        return
+        self.wofost._send_signal(signal=pcse.signals.irrigate, amount=5*action, efficiency=0.7) # water in cm
 
     def reset(self):
         self.wofost = pcse.models.Wofost71_WLP_FD(self.parameterprovider, self.weatherdataprovider, self.agromanagement)
