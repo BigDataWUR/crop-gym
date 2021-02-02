@@ -4,8 +4,8 @@ import gym
 from concurrent.futures import ProcessPoolExecutor
 
 
-def do(it):
-    env = gym.make("gym_crop:irrigation-v0")
+def do(it, env_name):
+    env = gym.make(env_name)
     env.seed(it)
     env.action_space.seed(it)
     env.reset()
@@ -19,14 +19,19 @@ def do(it):
                 break
     return observations
 
+def do_wrapper(args):
+    do(*args)
+
 
 if __name__ == "__main__":
     maxit = 20
-    with ProcessPoolExecutor() as executor:
-        results1 = executor.map(do, range(2, maxit))
-        results2 = executor.map(do, range(2, maxit))
-    for a,b in zip(results1, results2):
-        if np.array_equiv(a, b):
-            print("equal, yay")
-        else:
-            print("not equal :(")
+    for env_name in ['gym_crop:irrigation-v0', 'gym_crop:fertilization-v0']:
+        iterations = range(2, maxit)
+        args = {(iteration, env_name) for iteration in iterations}
+        with ProcessPoolExecutor() as executor:
+            results1 = executor.map(do_wrapper, args)
+            results2 = executor.map(do_wrapper, args)
+        for a,b in zip(results1, results2):
+            if not np.array_equiv(a, b):
+                raise ValueError(f"Instances of {env_name} not equal")
+        print(f"{env_name} all good!")

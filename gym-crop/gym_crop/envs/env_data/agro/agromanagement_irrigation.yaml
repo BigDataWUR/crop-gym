@@ -1,7 +1,7 @@
 - 2006-03-01:
     CropCalendar:
-        crop_name: sugarbeet
-        variety_name: Sugarbeet_603
+        crop_name: potato
+        variety_name: Potato_704
         crop_start_date: 2006-03-01
         crop_start_type: emergence
         crop_end_date: 2006-10-20

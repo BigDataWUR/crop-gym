@@ -9,15 +9,15 @@ import pcse
 
 data_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'env_data/')
 
-class IrrigationEnv(gym.Env):
+class FertilizationEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self, data_dir=data_dir, intervention_interval=7, weather_forecast_length=7):
         self.action_space = gym.spaces.Discrete(5)
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(74,))
-        crop = pcse.fileinput.YAMLCropDataProvider()
-        soil = pcse.fileinput.CABOFileReader(os.path.join(data_dir, "soil", "ec3.soil"))
-        site = pcse.util.WOFOST71SiteDataProvider(WAV=100,CO2=360)
+        soil = pcse.fileinput.CABOFileReader(os.path.join(data_dir, "soil/wofost_npk.soil"))
+        site = pcse.fileinput.CABOFileReader(os.path.join(data_dir, "site/wofost_npk.site"))
+        crop = pcse.fileinput.CABOFileReader(os.path.join(data_dir, "crop/wofost_npk.crop"))
         self.parameterprovider = pcse.base.ParameterProvider(soildata=soil, cropdata=crop, sitedata=site)
         weatherfile = os.path.join(data_dir, 'meteo', 'nl1.xlsx')
         self.weatherdataprovider = pcse.fileinput.ExcelWeatherDataProvider(weatherfile)
@@ -65,8 +65,7 @@ class IrrigationEnv(gym.Env):
         return observation, reward, done, {}
 
     def _load_agromanagement_data(self):
-        with open(os.path.join(data_dir, 'agro/agromanagement_irrigation.yaml')) as file:
-            agromanagement = yaml.load(file, Loader=yaml.SafeLoader)
+        agromanagement = yaml.safe_load(open(os.path.join(data_dir, "agro/wofost_npk.agro")))['AgroManagement']
         crop_end_date = list(agromanagement[0].values())[0]['CropCalendar']['crop_end_date']
         return agromanagement, crop_end_date
 
