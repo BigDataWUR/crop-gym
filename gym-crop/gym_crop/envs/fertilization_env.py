@@ -14,15 +14,14 @@ class FertilizationEnv(gym.Env):
 
     def __init__(self, data_dir=data_dir, intervention_interval=7, weather_forecast_length=7):
         self.action_space = gym.spaces.Discrete(5)
-        self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(74,))
-        soil = pcse.fileinput.CABOFileReader(os.path.join(data_dir, "soil/wofost_npk.soil"))
-        site = pcse.fileinput.CABOFileReader(os.path.join(data_dir, "site/wofost_npk.site"))
-        crop = pcse.fileinput.CABOFileReader(os.path.join(data_dir, "crop/wofost_npk.crop"))
+        self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(81,))
+        crop = pcse.fileinput.PCSEFileReader(os.path.join(data_dir, "crop", "lintul3_springwheat.crop"))
+        soil = pcse.fileinput.PCSEFileReader(os.path.join(data_dir, "soil", "lintul3_springwheat.soil"))
+        site = pcse.fileinput.PCSEFileReader(os.path.join(data_dir, "site", "lintul3_springwheat.site"))
         self.parameterprovider = pcse.base.ParameterProvider(soildata=soil, cropdata=crop, sitedata=site)
-        weatherfile = os.path.join(data_dir, 'meteo', 'nl1.xlsx')
-        self.weatherdataprovider = pcse.fileinput.ExcelWeatherDataProvider(weatherfile)
+        self.weatherdataprovider = pcse.db.NASAPowerWeatherDataProvider(52, 5.2)
         self.agromanagement, self.crop_end_date = self._load_agromanagement_data()
-        self.wofost = pcse.models.Wofost72_WLP_FD(self.parameterprovider, self.weatherdataprovider, self.agromanagement)
+        self.model = pcse.models.LINTUL3(self.parameterprovider, self.weatherdataprovider, self.agromanagement)
         self.intervention_interval = intervention_interval
         self.weather_forecast_length = weather_forecast_length
 
@@ -58,7 +57,7 @@ class FertilizationEnv(gym.Env):
         output = self._run_simulation()
         observation = self._process_output(output)
 
-        growth = output['TWSO'][-1] - output['TWSO'][-1-self.intervention_interval]
+        growth = output['WSO'][-1] - output['WSO'][-1-self.intervention_interval]
         reward = growth if not np.isnan(growth) else 0
 
         done = self.date > self.crop_end_date
@@ -78,17 +77,17 @@ class FertilizationEnv(gym.Env):
         return observation
 
     def _run_simulation(self):
-        self.wofost.run(days=self.intervention_interval)
-        output = pd.DataFrame(self.wofost.get_output()).set_index("day")
+        self.model.run(days=self.intervention_interval)
+        output = pd.DataFrame(self.model.get_output()).set_index("day")
         output = output.fillna(value=np.nan)
         self.date = output.index[-1]
         return output
 
     def _take_action(self, action):
-        self.wofost._send_signal(signal=pcse.signals.irrigate, amount=2*action, efficiency=0.7) # water in cm
+        self.model._send_signal(signal=pcse.signals.irrigate, amount=2*action, efficiency=0.7) # water in cm
 
     def reset(self):
-        self.wofost = pcse.models.Wofost71_WLP_FD(self.parameterprovider, self.weatherdataprovider, self.agromanagement)
+        self.model = pcse.models.LINTUL3(self.parameterprovider, self.weatherdataprovider, self.agromanagement)
         output = self._run_simulation()
         observation = self._process_output(output)
         return observation
