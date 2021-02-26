@@ -15,7 +15,7 @@ class FertilizationEnv(gym.Env):
     def __init__(self, data_dir=data_dir, intervention_interval=7, weather_forecast_length=7):
         self.action_space = gym.spaces.Discrete(5)
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(81,))
-        crop = pcse.fileinput.PCSEFileReader(os.path.join(data_dir, "crop", "lintul3_springwheat.crop"))
+        crop = pcse.fileinput.PCSEFileReader(os.path.join(data_dir, "crop", "lintul3_winterwheat.crop"))
         soil = pcse.fileinput.PCSEFileReader(os.path.join(data_dir, "soil", "lintul3_springwheat.soil"))
         site = pcse.fileinput.PCSEFileReader(os.path.join(data_dir, "site", "lintul3_springwheat.site"))
         self.parameterprovider = pcse.base.ParameterProvider(soildata=soil, cropdata=crop, sitedata=site)
