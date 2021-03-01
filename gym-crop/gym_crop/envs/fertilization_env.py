@@ -64,7 +64,8 @@ class FertilizationEnv(gym.Env):
         return observation, reward, done, {}
 
     def _load_agromanagement_data(self):
-        agromanagement = yaml.safe_load(open(os.path.join(data_dir, "agro/wofost_npk.agro")))['AgroManagement']
+        with open(os.path.join(data_dir, 'agro/agromanagement_irrigation.yaml')) as file:
+            agromanagement = yaml.load(file, Loader=yaml.SafeLoader)
         crop_end_date = list(agromanagement[0].values())[0]['CropCalendar']['crop_end_date']
         return agromanagement, crop_end_date
 
@@ -84,7 +85,7 @@ class FertilizationEnv(gym.Env):
         return output
 
     def _take_action(self, action):
-        self.model._send_signal(signal=pcse.signals.irrigate, amount=2*action, efficiency=0.7) # water in cm
+        self.model._send_signal(signal=pcse.signals.apply_n, amount=action*0.2, recovery=0.2)
 
     def reset(self):
         self.model = pcse.models.LINTUL3(self.parameterprovider, self.weatherdataprovider, self.agromanagement)

@@ -1,13 +1,14 @@
-- 2006-03-01:
+- 2006-10-01:
     CropCalendar:
-        crop_name: potato
-        variety_name: Potato_704
-        crop_start_date: 2006-03-01
+        crop_name: wheat
+        variety_name: winter wheat
+        crop_start_date: 2006-10-21
         crop_start_type: emergence
-        crop_end_date: 2006-10-20
+        crop_end_date: 2007-08-01
         crop_end_type: harvest
-        max_duration: 300
+        max_duration: 365
     StateEvents:
     TimedEvents:
-- 2007-01-01:
+- 2007-09-01:
+
   
