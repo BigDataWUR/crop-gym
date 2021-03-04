@@ -25,7 +25,7 @@ def do_wrapper(args):
 
 if __name__ == "__main__":
     maxit = 20
-    for env_name in ['gym_crop:irrigation-v0', 'gym_crop:fertilization-v0']:
+    for env_name in ['gym_crop:fertilization-v0']:
         iterations = range(2, maxit)
         args = {(iteration, env_name) for iteration in iterations}
         with ProcessPoolExecutor() as executor:
