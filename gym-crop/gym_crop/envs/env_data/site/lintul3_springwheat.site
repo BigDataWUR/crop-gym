@@ -9,3 +9,4 @@ WCSUBS = 0.15 			# water content subsoil
 # In both cases parameter IRRIGF must be taken 1.0. "Irrigation" thus
 WMFAC  = False
 IRRIGF = False			# Irrigation factor
+WMTAB = True

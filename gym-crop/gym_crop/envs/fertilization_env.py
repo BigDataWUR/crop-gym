@@ -29,6 +29,7 @@ class FertilizationEnv(gym.Env):
         self.seed(seed)
         self.agromanagement = self._load_agromanagement_data()
         self.model = pcse.models.LINTUL3(self.parameterprovider, self.weatherdataprovider, self.agromanagement)
+        self.baseline_score = self._calculate_baseline_score(self.parameterprovider, self.weatherdataprovider, self.agromanagement)
 
     def step(self, action):
         """
@@ -59,12 +60,14 @@ class FertilizationEnv(gym.Env):
                  use this for learning.
         """
         self._take_action(action)
-        output = self._run_simulation()
+        output = self._run_simulation(self.model)
+        self.date = output.index[-1]
         observation = self._process_output(output)
 
         growth = output['WSO'][-1] - output['WSO'][-1-self.intervention_interval]
         growth = growth if not np.isnan(growth) else 0
         reward = growth - self.beta * action * self.amount
+        reward /= self.baseline_score
         done = self.date >= self.crop_end_date
         return observation, reward, done, {}
 
@@ -88,27 +91,40 @@ class FertilizationEnv(gym.Env):
         target_year = self.np_random.choice(train_weather_data)
         new_date = old_date.replace(target_year)
         content = dict_[old_date]
-        content['CropCalendar']['crop_start_date'] = content['CropCalendar']['crop_start_date'].replace(target_year)
+        self.crop_start_date = content['CropCalendar']['crop_start_date'].replace(target_year)
+        content['CropCalendar']['crop_start_date'] = self.crop_start_date
         self.crop_end_date = content['CropCalendar']['crop_end_date'].replace(target_year+1)
         content['CropCalendar']['crop_end_date'] = self.crop_end_date
         dict_[new_date] = dict_.pop(old_date)
         return agromanagement
 
-    def _run_simulation(self):
-        self.model.run(days=self.intervention_interval)
-        output = pd.DataFrame(self.model.get_output()).set_index("day")
+    def _run_simulation(self, model):
+        model.run(days=self.intervention_interval)
+        output = pd.DataFrame(model.get_output()).set_index("day")
         output = output.fillna(value=np.nan)
-        self.date = output.index[-1]
         return output
 
     def _take_action(self, action):
         self.model._send_signal(signal=pcse.signals.apply_n, amount=action*self.amount, recovery=0.2)
 
+    def _calculate_baseline_score(self, parameterprovider, weatherprovider, agromanagement):
+        baseline_model = pcse.models.LINTUL3(self.parameterprovider, self.weatherdataprovider, self.agromanagement)
+        date = self.crop_start_date
+        while date < self.crop_end_date:
+            baseline_model.run(days=self.intervention_interval)
+            output = pd.DataFrame(baseline_model.get_output()).set_index("day")
+            date = output.index[-1]
+        baseline_score = output['WSO'][-1]
+        return baseline_score
+
     def reset(self):
         self._replace_year(self.agromanagement)
+        self.baseline_score = self._calculate_baseline_score(self.parameterprovider, self.weatherdataprovider, self.agromanagement)
+        self.crop_start_date = list(self.agromanagement[0].values())[0]['CropCalendar']['crop_start_date']
         self.crop_end_date = list(self.agromanagement[0].values())[0]['CropCalendar']['crop_end_date']
+        self.date = self.crop_start_date
         self.model = pcse.models.LINTUL3(self.parameterprovider, self.weatherdataprovider, self.agromanagement)
-        output = self._run_simulation()
+        output = self._run_simulation(self.model)
         observation = self._process_output(output)
         return observation
 
