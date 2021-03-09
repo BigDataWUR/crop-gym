@@ -15,7 +15,7 @@ class FertilizationEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self, data_dir=data_dir, intervention_interval=7, weather_forecast_length=7, beta=1, seed=0):
-        self.action_space = gym.spaces.Discrete(5)
+        self.action_space = gym.spaces.Discrete(7)
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(81,))
         crop = pcse.fileinput.PCSEFileReader(os.path.join(data_dir, "crop", "lintul3_winterwheat.crop"))
         soil = pcse.fileinput.PCSEFileReader(os.path.join(data_dir, "soil", "lintul3_springwheat.soil"))
@@ -30,6 +30,8 @@ class FertilizationEnv(gym.Env):
         self.agromanagement = self._load_agromanagement_data()
         self.model = pcse.models.LINTUL3(self.parameterprovider, self.weatherdataprovider, self.agromanagement)
         self.baseline_model = pcse.models.LINTUL3(self.parameterprovider, self.weatherdataprovider, self.agromanagement)
+        self.growth = []
+        self.baseline_growth = []
 
     def step(self, action):
         """
@@ -67,11 +69,18 @@ class FertilizationEnv(gym.Env):
 
         growth = output['WSO'][-1] - output['WSO'][-1-self.intervention_interval]
         growth = growth if not np.isnan(growth) else 0
+        self.growth.append(growth)
         baseline_growth = baseline_output['WSO'][-1] - baseline_output['WSO'][-1-self.intervention_interval]
         baseline_growth = baseline_growth if not np.isnan(baseline_growth) else 0
-        reward = growth - baseline_growth - self.beta * action * self.amount
+        self.baseline_growth.append(baseline_growth)
+
+        reward = growth - baseline_growth - self.beta * action * self.amount * 10 # factor 10 is for unit conversion from g/m^2 to kg/ha
         done = self.date >= self.crop_end_date
-        return observation, reward, done, {}
+
+        info = output.to_dict()
+        info['growth'] = self.growth
+        info['baseline_growth'] = self.baseline_growth
+        return observation, reward, done, info
 
     def _load_agromanagement_data(self):
         with open(os.path.join(data_dir, 'agro/agromanagement_irrigation.yaml')) as file:
@@ -107,7 +116,7 @@ class FertilizationEnv(gym.Env):
         return output
 
     def _take_action(self, action):
-        self.model._send_signal(signal=pcse.signals.apply_n, amount=action*self.amount, recovery=0.2)
+        self.model._send_signal(signal=pcse.signals.apply_n, amount=action**2*self.amount, recovery=0.7)
 
     def reset(self):
         self._replace_year(self.agromanagement)
@@ -116,7 +125,10 @@ class FertilizationEnv(gym.Env):
         self.date = self.crop_start_date
         self.model = pcse.models.LINTUL3(self.parameterprovider, self.weatherdataprovider, self.agromanagement)
         self.baseline_model = pcse.models.LINTUL3(self.parameterprovider, self.weatherdataprovider, self.agromanagement)
+        self.growth = []
+        self.baseline_growth = []
         output = self._run_simulation(self.model)
+        baseline_output = self._run_simulation(self.baseline_model)
         observation = self._process_output(output)
         return observation
 
