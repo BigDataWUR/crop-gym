@@ -14,7 +14,7 @@ train_weather_data = [1983, 1985, 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993
 class FertilizationEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, data_dir=data_dir, intervention_interval=7, weather_forecast_length=7, beta=1, seed=0):
+    def __init__(self, data_dir=data_dir, intervention_interval=7, weather_forecast_length=7, beta=1, seed=0, fixed_year=None):
         self.action_space = gym.spaces.Discrete(7)
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(81,))
         crop = pcse.fileinput.PCSEFileReader(os.path.join(data_dir, "crop", "lintul3_winterwheat.crop"))
@@ -27,6 +27,7 @@ class FertilizationEnv(gym.Env):
         self.beta = beta
         self.amount = 0.025*self.intervention_interval
         self.seed(seed)
+        self.fixed_year = fixed_year
         self.agromanagement = self._load_agromanagement_data()
         self.model = pcse.models.LINTUL3(self.parameterprovider, self.weatherdataprovider, self.agromanagement)
         self.baseline_model = pcse.models.LINTUL3(self.parameterprovider, self.weatherdataprovider, self.agromanagement)
@@ -99,7 +100,7 @@ class FertilizationEnv(gym.Env):
     def _replace_year(self, agromanagement):
         dict_ = agromanagement[0]
         old_date = next(iter(dict_.keys()))
-        target_year = self.np_random.choice(train_weather_data)
+        target_year = self.np_random.choice(train_weather_data) if not self.fixed_year else self.fixed_year
         new_date = old_date.replace(target_year)
         content = dict_[old_date]
         self.crop_start_date = content['CropCalendar']['crop_start_date'].replace(target_year)
