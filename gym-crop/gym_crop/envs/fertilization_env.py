@@ -12,7 +12,7 @@ data_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'env_data/'
 all_years = range(1983, 2018)
 missing_data = [2007, 2008, 2010, 2013, 2015, 2017]
 test_years = [1984, 1994, 2004, 2014]
-train_weather_data = [year for year in all_years if year not in missing_data+test_years]
+train_weather_data = [year for year in all_years if year not in missing_data + test_years]
 
 class FertilizationEnv(gym.Env):
     metadata = {'render.modes': ['human']}
@@ -27,7 +27,7 @@ class FertilizationEnv(gym.Env):
         self.intervention_interval = intervention_interval
         self.weather_forecast_length = weather_forecast_length
         self.beta = beta
-        self.amount = 0.025*self.intervention_interval
+        self.amount = 2*self.intervention_interval/7
         self.seed(seed)
         self.fixed_location = fixed_location
         self.weatherdataprovider = self._get_weatherdataprovider()
@@ -136,7 +136,7 @@ class FertilizationEnv(gym.Env):
         return output
 
     def _take_action(self, action):
-        amount = action**2*self.amount # in g/m^2
+        amount = action*self.amount # in g/m^2
         self.model._send_signal(signal=pcse.signals.apply_n, amount=amount, recovery=0.7)
         return amount
 
