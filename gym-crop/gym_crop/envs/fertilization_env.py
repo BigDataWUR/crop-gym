@@ -9,30 +9,33 @@ import pcse
 
 data_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'env_data/')
 
-train_weather_data = [1983, 1985, 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2005, 2006, 2007, 2009, 2010, 2011, 2012, 2016, 2018]
+all_years = range(1983, 2018)
+missing_data = [2007, 2008, 2010, 2013, 2015, 2017]
+test_years = [1984, 1994, 2004, 2014]
+train_weather_data = [year for year in all_years if year not in missing_data+test_years]
 
 class FertilizationEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, data_dir=data_dir, intervention_interval=7, weather_forecast_length=7, beta=1, seed=0, fixed_year=None):
+    def __init__(self, data_dir=data_dir, intervention_interval=7, weather_forecast_length=7, beta=1, seed=0, fixed_year=None, fixed_location=None):
         self.action_space = gym.spaces.Discrete(7)
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(81,))
         crop = pcse.fileinput.PCSEFileReader(os.path.join(data_dir, "crop", "lintul3_winterwheat.crop"))
         soil = pcse.fileinput.PCSEFileReader(os.path.join(data_dir, "soil", "lintul3_springwheat.soil"))
         site = pcse.fileinput.PCSEFileReader(os.path.join(data_dir, "site", "lintul3_springwheat.site"))
         self.parameterprovider = pcse.base.ParameterProvider(soildata=soil, cropdata=crop, sitedata=site)
-        self.weatherdataprovider = pcse.db.NASAPowerWeatherDataProvider(52, 5.2)
         self.intervention_interval = intervention_interval
         self.weather_forecast_length = weather_forecast_length
         self.beta = beta
         self.amount = 0.025*self.intervention_interval
         self.seed(seed)
+        self.fixed_location = fixed_location
+        self.weatherdataprovider = self._get_weatherdataprovider()
         self.fixed_year = fixed_year
         self.agromanagement = self._load_agromanagement_data()
         self.model = pcse.models.LINTUL3(self.parameterprovider, self.weatherdataprovider, self.agromanagement)
         self.baseline_model = pcse.models.LINTUL3(self.parameterprovider, self.weatherdataprovider, self.agromanagement)
-        self.growth = []
-        self.baseline_growth = []
+        self.log = self._init_log()
 
     def step(self, action):
         """
@@ -62,7 +65,7 @@ class FertilizationEnv(gym.Env):
                  However, official evaluations of your agent are not allowed to
                  use this for learning.
         """
-        self._take_action(action)
+        fertilizer = self._take_action(action)
         output = self._run_simulation(self.model)
         baseline_output = self._run_simulation(self.baseline_model)
         self.date = output.index[-1]
@@ -70,24 +73,32 @@ class FertilizationEnv(gym.Env):
 
         growth = output['WSO'][-1] - output['WSO'][-1-self.intervention_interval]
         growth = growth if not np.isnan(growth) else 0
-        self.growth.append(growth)
         baseline_growth = baseline_output['WSO'][-1] - baseline_output['WSO'][-1-self.intervention_interval]
         baseline_growth = baseline_growth if not np.isnan(baseline_growth) else 0
-        self.baseline_growth.append(baseline_growth)
 
-        reward = growth - baseline_growth - self.beta * action * self.amount * 10 # factor 10 is for unit conversion from g/m^2 to kg/ha
+        reward = growth - baseline_growth - self.beta * fertilizer
         done = self.date >= self.crop_end_date
 
-        info = output.to_dict()
-        info['growth'] = self.growth
-        info['baseline_growth'] = self.baseline_growth
+        self._log(growth, baseline_growth, fertilizer, reward)
+
+        info = {**output.to_dict(), **self.log}
+
         return observation, reward, done, info
+
+    def _init_log(self):
+        return {'growth': dict(), 'baseline_growth': dict(), 'fertilizer': dict(), 'reward': dict()}
 
     def _load_agromanagement_data(self):
         with open(os.path.join(data_dir, 'agro/agromanagement_irrigation.yaml')) as file:
             agromanagement = yaml.load(file, Loader=yaml.SafeLoader)
         self._replace_year(agromanagement)
         return agromanagement
+
+    def _log(self, growth, baseline_growth, fertilizer, reward):
+        self.log['growth'][self.date] = growth
+        self.log['baseline_growth'][self.date] = baseline_growth
+        self.log['fertilizer'][self.date - datetime.timedelta(self.intervention_interval)] = fertilizer
+        self.log['reward'][self.date] = reward
 
     def _process_output(self, output): 
         crop_observation = np.array(output.iloc[-1])
@@ -110,6 +121,14 @@ class FertilizationEnv(gym.Env):
         dict_[new_date] = dict_.pop(old_date)
         return agromanagement
 
+    def _get_weatherdataprovider(self):
+        location = self.fixed_location
+        if not location:
+            latitude = self.np_random.choice([51.5, 52, 52.5])
+            longitude = self.np_random.choice([5, 5.5, 6])
+            location = (latitude, longitude)
+        return pcse.db.NASAPowerWeatherDataProvider(*location)
+
     def _run_simulation(self, model):
         model.run(days=self.intervention_interval)
         output = pd.DataFrame(model.get_output()).set_index("day")
@@ -117,10 +136,14 @@ class FertilizationEnv(gym.Env):
         return output
 
     def _take_action(self, action):
-        self.model._send_signal(signal=pcse.signals.apply_n, amount=action**2*self.amount, recovery=0.7)
+        amount = action**2*self.amount # in g/m^2
+        self.model._send_signal(signal=pcse.signals.apply_n, amount=amount, recovery=0.7)
+        return amount
 
     def reset(self):
+        self.log = self._init_log()
         self._replace_year(self.agromanagement)
+        self.weatherdataprovider = self._get_weatherdataprovider()
         self.crop_start_date = list(self.agromanagement[0].values())[0]['CropCalendar']['crop_start_date']
         self.crop_end_date = list(self.agromanagement[0].values())[0]['CropCalendar']['crop_end_date']
         self.date = self.crop_start_date

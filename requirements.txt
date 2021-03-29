@@ -1,4 +1,4 @@
 --find-links https://download.pytorch.org/whl/torch_stable.html
 torch==1.7.1+cpu
-##tensorflow==2.4.0
+tensorflow==2.4.0
 stable-baselines3==0.10.0
