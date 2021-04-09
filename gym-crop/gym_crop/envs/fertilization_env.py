@@ -112,9 +112,9 @@ class FertilizationEnv(gym.Env):
         dict_ = agromanagement[0]
         old_date = next(iter(dict_.keys()))
         target_year = self.np_random.choice(train_weather_data) if not self.fixed_year else self.fixed_year
-        new_date = old_date.replace(target_year)
+        new_date = old_date.replace(target_year+1)
         content = dict_[old_date]
-        self.crop_start_date = content['CropCalendar']['crop_start_date'].replace(target_year)
+        self.crop_start_date = content['CropCalendar']['crop_start_date'].replace(target_year+1)
         content['CropCalendar']['crop_start_date'] = self.crop_start_date
         self.crop_end_date = content['CropCalendar']['crop_end_date'].replace(target_year+1)
         content['CropCalendar']['crop_end_date'] = self.crop_end_date

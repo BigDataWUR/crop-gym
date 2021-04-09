@@ -56,4 +56,4 @@ WSOI = 0.0
 WSTI = 0.0
 FRTRL = 0.2             # See paper Herman
 RTMIN = 0.03            # See paper Herman, table 4 parameter from Wageningen
-TNSOILI = 7.7           # See paper Herman, table 4 parameter from Wageningen
+TNSOILI = 7.7         # See paper Herman, table 4 parameter from Wageningen
