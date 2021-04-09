@@ -1,2 +1,1 @@
-from gym_crop.envs.irrigation_env import IrrigationEnv
 from gym_crop.envs.fertilization_env import FertilizationEnv
