@@ -11,7 +11,7 @@ Clone this repository
 Install the crop gym environment with the following command
     
 ```
-pip install -e gym_crop/.
+pip install -e gym_crop/
 ```
 
 Install required packages for the training script by running:
