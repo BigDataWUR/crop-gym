@@ -9,5 +9,5 @@ The code has been tested using python 3.8.5.
 Clone this repository and install the crop gym environment with the following command
     
 ```
-pip install -e gym_crop/.
+pip install -e gym_crop
 ```
