@@ -11,3 +11,5 @@ Clone this repository and install the crop gym environment with the following co
 ```
 pip install -e gym_crop
 ```
+
+[This patch](https://github.com/ajwdewit/pcse/pull/43) to the PCSE package is required to be able to run the code.

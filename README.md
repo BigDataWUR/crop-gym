@@ -20,8 +20,13 @@ Install required packages for the training script by running:
 pip install -r requirements.txt
 ```
 
+[This patch](https://github.com/ajwdewit/pcse/pull/43) to the PCSE package is required to be able to run the code.
+
 ### Training an agent
 Agents can be trained using the following command:
 ```
 python scripts/training_script.py --name repr --beta 10 --tensorboard /path/to/tensorboard/save/dir --log /path/to/model/save/dir --n_steps=10000
 ```
+
+The results in the paper have been obtained with a yet unpublished branch of the PCSE package, which contains a recent calibration of crop growth parameters.
+
