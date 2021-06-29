@@ -1,6 +1,7 @@
 import argparse
 import os
 import gym
+from torch import nn as nn
 
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 from stable_baselines3 import PPO
@@ -39,11 +40,25 @@ def train(name, log_dir, tensorboard_dir, beta, n_steps, resume):
         env = Monitor(env, tensorboard_log)
     env = DummyVecEnv([lambda: env])
 
+    hyperparams = {'batch_size': 64,
+                   'n_steps': 1024,
+                   'learning_rate': 0.0002,
+                   'ent_coef': 5.2e-05,
+                   'clip_range': 0.3,
+                   'n_epochs': 5,
+                   'gae_lambda': 0.98,
+                   'max_grad_norm': 0.3,
+                   'vf_coef': 0.0888,
+                   'policy_kwargs': dict(net_arch=[dict(pi=[64, 64], vf=[64, 64])],
+                                         activation_fn=nn.Tanh,
+                                         ortho_init=False)
+                  }
+
     # train model
     if not resume:
         env = VecNormalize(env, norm_obs=True, norm_reward=False,
                            clip_obs=10., gamma=1,)
-        model = PPO('MlpPolicy', env, gamma=1, seed=0, verbose=1, tensorboard_log=tensorboard_log)
+        model = PPO('MlpPolicy', env, gamma=1, seed=0, verbose=1, **hyperparams, tensorboard_log=tensorboard_log)
     else:
         model = PPO.load(model_path, tensorboard_log=tensorboard_log)
         env = VecNormalize.load(stats_path, env)
