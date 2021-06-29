@@ -13,10 +13,10 @@ class FertilizationEnv(gym.Env):
     """An environment for OpenAI gym to study crop fertilization"""
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, intervention_interval=7, weather_forecast_length=7,\
-         beta=1, seed=0, fixed_year=None, fixed_location=None):
+    def __init__(self, intervention_interval=7,\
+         beta=10, seed=0, fixed_year=None, fixed_location=None):
         self.action_space = gym.spaces.Discrete(7)
-        self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(81,))
+        self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(53,))
         crop = pcse.fileinput.PCSEFileReader(os.path.join(DATA_DIR, "crop",
                                                           "lintul3_winterwheat.crop"))
         soil = pcse.fileinput.PCSEFileReader(os.path.join(DATA_DIR, "soil",
@@ -26,7 +26,6 @@ class FertilizationEnv(gym.Env):
         self.parameterprovider = pcse.base.ParameterProvider(soildata=soil, cropdata=crop,
                                                              sitedata=site)
         self.intervention_interval = intervention_interval
-        self.weather_forecast_length = weather_forecast_length
         self.beta = beta
         self.amount = 2*self.intervention_interval/7
         self.seed(seed)
@@ -76,8 +75,8 @@ class FertilizationEnv(gym.Env):
         fertilizer = self._take_action(action)
         output = self._run_simulation(self.model)
         baseline_output = self._run_simulation(self.baseline_model)
-        self.date = output.index[-1]
         observation = self._process_output(output)
+        self.date = output.index[-1]
 
         growth = output['WSO'][-1] - output['WSO'][-1-self.intervention_interval]
         growth = growth if not np.isnan(growth) else 0
@@ -112,10 +111,10 @@ class FertilizationEnv(gym.Env):
 
     def _process_output(self, output):
         crop_observation = np.array(output.iloc[-1])
-        # forecast for the week after the observation
-        weather_forecast = self._get_weather(self.weatherdataprovider, self.date,
-                                             self.weather_forecast_length)
-        observation = np.concatenate([crop_observation, weather_forecast.flatten()])
+        # weather until next intervention time
+        weather_observation = self._get_weather(self.weatherdataprovider, self.date,
+                                             self.intervention_interval)
+        observation = np.concatenate([crop_observation, weather_observation.flatten()])
         observation = np.nan_to_num(observation)
         return observation
 
@@ -226,5 +225,6 @@ class FertilizationEnv(gym.Env):
         numpy array containing the requested weatherdata
         """
         weatherdatacontainer = weatherdataprovider(date)
-        weather = [getattr(weatherdatacontainer, attr) for attr in weatherdatacontainer.required]
+        weather_vars = ['IRRAD', 'TMIN', 'TMAX', 'VAP', 'RAIN']
+        weather = [getattr(weatherdatacontainer, attr) for attr in weather_vars]
         return weather
