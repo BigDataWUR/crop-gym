@@ -20,7 +20,7 @@ Install required packages for the training script by running:
 pip install -r requirements.txt
 ```
 
-[This patch](https://github.com/ajwdewit/pcse/pull/43) to the PCSE package is required to be able to run the code.
+[This patch](https://github.com/ajwdewit/pcse/pull/44) to the PCSE package is required to be able to run the code.
 
 ### Training an agent
 Agents can be trained using the following command:
